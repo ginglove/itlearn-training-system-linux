@@ -38,7 +38,8 @@ export default function LoginPage() {
         router.push("/reset-password");
       } else {
         // Store token
-        document.cookie = `session=${data.token}; path=/; max-age=28800; secure; samesite=strict`;
+        const isHttps = location.protocol === "https:";
+        document.cookie = `session=${data.token}; path=/; max-age=28800;${isHttps ? " secure;" : ""} samesite=strict`;
         localStorage.setItem("user", JSON.stringify(data.user));
         
         if (data.user.role === "TEACHER") {
