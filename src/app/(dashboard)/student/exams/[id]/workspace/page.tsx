@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/toast";
 
 export default function ExamWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -15,9 +16,11 @@ export default function ExamWorkspacePage({ params }: { params: Promise<{ id: st
   const [isExiting, setIsExiting] = useState(false);
   const [focusLosses, setFocusLosses] = useState(0);
   const [timeLeft, setTimeLeft] = useState(3600);
+  const showToast = useToast();
   const [runResults, setRunResults] = useState<Record<string, any>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [activeTab, setActiveTab] = useState<"cases" | "output">("cases");
+  const [showUntestedWarning, setShowUntestedWarning] = useState(false);
   const [settings, setSettings] = useState<any>(null);
   const submissionId = typeof window !== 'undefined' ? sessionStorage.getItem(`exam_${examId}_submission_id`) : null;
 
@@ -211,7 +214,19 @@ export default function ExamWorkspacePage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleSubmitClick = () => {
+    const untestedCode = questions.filter(
+      (q) => q.type === "CODE" && !runResults[q.id]
+    );
+    if (untestedCode.length > 0) {
+      setShowUntestedWarning(true);
+    } else {
+      handleSubmit();
+    }
+  };
+
   const handleSubmit = async () => {
+    setShowUntestedWarning(false);
     setIsSubmitting(true);
     try {
       const payloads = Object.entries(answers).map(([qId, ans]) => ({
@@ -233,11 +248,11 @@ export default function ExamWorkspacePage({ params }: { params: Promise<{ id: st
         sessionStorage.removeItem(`exam_${examId}_submission_id`);
         router.push("/student/exams");
       } else {
-        alert("Failed to submit exam. Please try again.");
+        showToast("Failed to submit exam. Please try again.", "error");
         setIsSubmitting(false);
       }
     } catch (err) {
-      alert("Network error. Drafts are saved, try again.");
+      showToast("Network error. Drafts are saved, try again.", "error");
       setIsSubmitting(false);
     }
   };
@@ -312,7 +327,7 @@ export default function ExamWorkspacePage({ params }: { params: Promise<{ id: st
             {isExiting ? "Saving..." : "Save & Exit"}
           </button>
           <button
-            onClick={handleSubmit}
+            onClick={handleSubmitClick}
             disabled={isSubmitting || isExiting}
             className="premium-btn-primary py-2 px-6 text-sm"
           >
@@ -624,6 +639,62 @@ export default function ExamWorkspacePage({ params }: { params: Promise<{ id: st
         </main>
       </div>
       
+      {/* Untested Code Warning Modal */}
+      {showUntestedWarning && (() => {
+        const untested = questions.map((q, idx) => ({ q, idx })).filter(({ q }) => q.type === "CODE" && !runResults[q.id]);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-bg-surface border border-amber-500/30 rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-base">Code Not Tested</h3>
+                  <p className="text-amber-400 text-sm font-medium mt-0.5">
+                    {untested.length} question{untested.length > 1 ? "s" : ""} haven&apos;t been run yet
+                  </p>
+                </div>
+              </div>
+
+              {/* Question list */}
+              <div className="bg-bg-base rounded-xl border border-border-strong divide-y divide-border-strong mb-5 max-h-56 overflow-y-auto">
+                {untested.map(({ q, idx }) => (
+                  <div key={q.id} className="flex items-start gap-3 px-4 py-3">
+                    <span className="w-6 h-6 rounded bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {idx + 1}
+                    </span>
+                    <p className="text-text-secondary text-sm leading-snug line-clamp-2">{q.content}</p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-text-tertiary text-xs mb-5">
+                Running your code lets you verify it works before submitting. You can still submit without testing, but untested code may not receive full marks.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowUntestedWarning(false)}
+                  className="flex-1 premium-btn-secondary py-2.5 text-sm"
+                >
+                  Go Back &amp; Test
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  className="flex-1 premium-btn-primary py-2.5 text-sm"
+                >
+                  Submit Anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Footer Navigation */}
       <footer className="h-16 border-t border-border-strong bg-bg-surface flex items-center justify-between px-8 shrink-0">
         <button

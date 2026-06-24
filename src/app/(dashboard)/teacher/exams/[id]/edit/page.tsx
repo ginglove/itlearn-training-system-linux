@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import DateTimePicker from "@/app/components/DateTimePicker";
+import { useToast, ConfirmModal } from "@/components/toast";
 
 export default function EditExamPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -21,11 +22,11 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
 
   const [students, setStudents] = useState<any[]>([]);
   const [assignedStudents, setAssignedStudents] = useState<string[]>([]);
+  const showToast = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     fetchExamAndStudents();
@@ -34,7 +35,6 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
   const fetchExamAndStudents = async () => {
     try {
       setIsLoading(true);
-      setError("");
 
       // Fetch Exam details
       const examRes = await fetch(`/api/v1/teacher/exams/${examId}`);
@@ -69,7 +69,7 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
       setAssignedStudents(exam.assignedStudents || []);
       setStudents(studentsData.students || []);
     } catch (err: any) {
-      setError(err.message || "An error occurred while loading data");
+      showToast(err.message || "An error occurred while loading data", "error");
     } finally {
       setIsLoading(false);
     }
@@ -86,8 +86,6 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    setError("");
-    setSuccess("");
 
     try {
       const res = await fetch(`/api/v1/teacher/exams/${examId}`, {
@@ -102,25 +100,20 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
       });
 
       if (res.ok) {
-        setSuccess("Exam configurations updated successfully!");
+        showToast("Exam configurations updated successfully!");
       } else {
         const data = await res.json();
-        setError(data.message || "Failed to update exam");
+        showToast(data.message || "Failed to update exam", "error");
       }
     } catch (err) {
-      setError("Network error occurred.");
+      showToast("Network error occurred.", "error");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this exam? All student submissions and grades for this exam will be permanently lost.")) {
-      return;
-    }
-
     setIsDeleting(true);
-    setError("");
 
     try {
       const res = await fetch(`/api/v1/teacher/exams/${examId}`, {
@@ -131,11 +124,11 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
         router.push("/teacher");
       } else {
         const data = await res.json();
-        setError(data.message || "Failed to delete exam");
+        showToast(data.message || "Failed to delete exam", "error");
         setIsDeleting(false);
       }
     } catch (err) {
-      setError("Network error occurred.");
+      showToast("Network error occurred.", "error");
       setIsDeleting(false);
     }
   };
@@ -162,7 +155,7 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
             <h1 className="text-3xl font-bold text-white">Edit Exam Settings</h1>
           </div>
           <button
-            onClick={handleDelete}
+            onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting}
             className="px-4 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-all font-semibold text-sm"
           >
@@ -171,17 +164,6 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
         </div>
 
         <div className="glass-card p-8">
-          {error && (
-            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm px-4 py-3 rounded-lg mb-6">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm px-4 py-3 rounded-lg mb-6">
-              {success}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">Exam Title</label>
@@ -319,6 +301,17 @@ export default function EditExamPage({ params }: { params: Promise<{ id: string 
           </form>
         </div>
       </div>
+
+      <ConfirmModal
+        open={showDeleteConfirm}
+        variant="danger"
+        title="Delete Exam"
+        description="Are you sure you want to permanently delete this exam? All student submissions, answers, and grades will be lost. This action cannot be undone."
+        confirmLabel={isDeleting ? "Deleting..." : "Delete Exam"}
+        cancelLabel="Keep Exam"
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={() => { setShowDeleteConfirm(false); handleDelete(); }}
+      />
     </div>
   );
 }
