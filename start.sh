@@ -20,6 +20,12 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM EXIT
 
+if [[ ! -f ".next/BUILD_ID" ]]; then
+  echo "[start] No production build found. Running next build..."
+  node_modules/.bin/next build 2>&1 | tee "$LOG_DIR/build.log"
+  echo "[start] Build complete."
+fi
+
 echo "[start] Starting Next.js server..."
 node_modules/.bin/next start 2>&1 | tee "$LOG_DIR/next.log" &
 NEXT_PID=$!
