@@ -25,13 +25,24 @@ node_modules/.bin/next start 2>&1 | tee "$LOG_DIR/next.log" &
 NEXT_PID=$!
 
 echo "[start] Waiting for server to be ready on port 3000..."
+SERVER_UP=0
 for i in $(seq 1 30); do
+  if ! kill -0 "$NEXT_PID" 2>/dev/null; then
+    echo "[start] Next.js exited prematurely. Check logs/next.log"
+    exit 1
+  fi
   if curl -sf http://localhost:3000 > /dev/null 2>&1; then
     echo "[start] Server is up."
+    SERVER_UP=1
     break
   fi
   sleep 1
 done
+
+if [[ $SERVER_UP -eq 0 ]]; then
+  echo "[start] Server did not become ready in 30s. Check logs/next.log"
+  exit 1
+fi
 
 echo "[start] Starting worker..."
 node_modules/.bin/tsx scripts/worker.ts 2>&1 | tee "$LOG_DIR/worker.log" &
