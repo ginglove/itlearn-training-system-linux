@@ -7,6 +7,7 @@ import {
   timestamp,
   integer,
   decimal,
+  json,
   pgEnum,
   uniqueIndex,
   index,
@@ -133,6 +134,7 @@ export const examSubmissions = pgTable(
     startAt: timestamp("start_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    questionOrder: json("question_order").$type<string[]>(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     totalScore: decimal("total_score", { precision: 5, scale: 2 }).default(
       "0.00"
@@ -202,7 +204,7 @@ export const examAssignments = pgTable(
 export const platformSettings = pgTable("platform_settings", {
   id: uuid("id").defaultRandom().primaryKey(),
   pistonApiUrl: varchar("piston_api_url", { length: 255 }).notNull().default("https://emkc.org/api/v2/piston"),
-  queueBackend: varchar("queue_backend", { length: 100 }).notNull().default("Local Redis"),
+  queueBackend: varchar("queue_backend", { length: 100 }).notNull().default("Upstash Redis"),
   sessionType: varchar("session_type", { length: 100 }).notNull().default("JWT (HTTP-only Cookie)"),
   ipBinding: boolean("ip_binding").notNull().default(true),
   passwordResetEnforced: boolean("password_reset_enforced").notNull().default(true),

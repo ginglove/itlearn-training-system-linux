@@ -117,7 +117,7 @@ console.log(add(5, 7));
     console.log("Seeding default platform settings...");
     await db.insert(schema.platformSettings).values({
       pistonApiUrl: "https://emkc.org/api/v2/piston",
-      queueBackend: "Local Redis",
+      queueBackend: "Upstash Redis",
       sessionType: "JWT (HTTP-only Cookie)",
       ipBinding: true,
       passwordResetEnforced: true,

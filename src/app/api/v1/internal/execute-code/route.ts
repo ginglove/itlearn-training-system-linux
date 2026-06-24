@@ -3,10 +3,13 @@ import { db } from "@/db";
 import { submissionDetails, codeConfigs, testCases } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { executeCode } from "@/lib/grading/code-executor";
-import Redis from "ioredis";
+import { Redis } from "@upstash/redis";
 import { questions } from "@/db/schema";
 
-const redis = new Redis(process.env.REDIS_URL || "redis://127.0.0.1:6379");
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || "",
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || "",
+});
 
 // We'll use a secret token to protect this internal route (called by a cron or worker)
 const INTERNAL_CRON_SECRET = process.env.INTERNAL_CRON_SECRET;
@@ -22,13 +25,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     }
 
-    // 2. Pull a job from the local Redis queue (right pop)
+    // 2. Pull a job from the Upstash Redis queue (right pop)
     const rawJob = await redis.rpop("code_execution_queue");
     if (!rawJob) {
       return NextResponse.json({ status: "IDLE", message: "No jobs in queue" });
     }
 
-    const job = JSON.parse(rawJob);
+    // Handle different return types from upstash
+    const jobStr = typeof rawJob === 'string' ? rawJob : JSON.stringify(rawJob);
+    const job = JSON.parse(jobStr);
 
     const { submissionId, questionId, sourceCode, language } = job;
 

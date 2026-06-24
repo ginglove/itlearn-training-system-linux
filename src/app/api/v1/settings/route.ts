@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         .insert(platformSettings)
         .values({
           pistonApiUrl: "https://emkc.org/api/v2/piston",
-          queueBackend: "Local Redis",
+          queueBackend: "Upstash Redis",
           sessionType: "JWT (HTTP-only Cookie)",
           ipBinding: true,
           passwordResetEnforced: true,
@@ -101,7 +101,7 @@ export async function PUT(request: NextRequest) {
         .insert(platformSettings)
         .values({
           pistonApiUrl: pistonApiUrl || "https://emkc.org/api/v2/piston",
-          queueBackend: queueBackend || "Local Redis",
+          queueBackend: queueBackend || "Upstash Redis",
           sessionType: sessionType || "JWT (HTTP-only Cookie)",
           ipBinding: ipBinding !== undefined ? !!ipBinding : true,
           passwordResetEnforced:
