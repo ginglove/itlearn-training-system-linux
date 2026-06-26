@@ -112,7 +112,9 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
   const { id: examId } = use(params);
   const [students, setStudents] = useState<any[]>([]);
   const [totalPossibleScore, setTotalPossibleScore] = useState("0");
+  const [totalQuestions, setTotalQuestions] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [forceSubmitting, setForceSubmitting] = useState<string | null>(null);
 
   useEffect(() => {
     let eventSource: EventSource;
@@ -123,6 +125,7 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
           const data = JSON.parse(e.data);
           setStudents(data.roster);
           setTotalPossibleScore(data.totalPossibleScore ?? "0");
+          setTotalQuestions(data.totalQuestions ?? 0);
         } catch (err) {
           console.error("SSE parse error:", err);
         }
@@ -136,6 +139,26 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
     return () => { if (eventSource) eventSource.close(); };
   }, [examId]);
 
+  const handleForceSubmit = async (studentId: string) => {
+    if (!confirm("Force-submit this student's exam? This will grade and finalize their current answers.")) return;
+    setForceSubmitting(studentId);
+    try {
+      const res = await fetch(`/api/v1/teacher/exams/${examId}/force-submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        alert(d.message ?? "Force-submit failed.");
+      }
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setForceSubmitting(null);
+    }
+  };
+
   const completed = students.filter((s) => s.submittedAt);
   const inProgress = students.filter((s) => !s.submittedAt);
 
@@ -147,6 +170,16 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
         <div className="mb-8 flex justify-between items-end border-b border-border-strong pb-6">
           <div>
             <div className="flex items-center gap-2 text-text-tertiary text-sm mb-2">
+              <button
+                onClick={() => router.back()}
+                className="flex items-center gap-1 hover:text-white transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back
+              </button>
+              <span>›</span>
               <button onClick={() => router.push("/teacher")} className="hover:text-white transition-colors">Exams</button>
               <span>›</span>
               <span className="text-text-secondary">Live Monitor</span>
@@ -181,7 +214,7 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-bg-surface-elevated/50 border-b border-border-strong">
-                {["Student", "IP", "Focus Losses", "Time Elapsed", "Status", "Score", ""].map((h) => (
+                {["Student", "IP", "Focus Losses", "Time Elapsed", "Progress", "Status", "Score", ""].map((h) => (
                   <th key={h} className="p-4 text-xs font-medium text-text-tertiary uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -189,7 +222,7 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
             <tbody className="divide-y divide-border-subtle">
               {students.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-text-tertiary">
+                  <td colSpan={8} className="p-10 text-center text-text-tertiary">
                     <div className="w-6 h-6 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mx-auto mb-3" />
                     Waiting for students to join...
                   </td>
@@ -223,6 +256,37 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
                             <div className="text-xs text-text-tertiary mt-0.5">completed</div>
                           )}
                         </td>
+                        {/* ── Progress cell ── */}
+                        <td className="p-4">
+                          {(() => {
+                            const answered = student.details?.length ?? 0;
+                            const total = totalQuestions;
+                            const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
+                            const pass = student.details?.filter((d: any) => d.result === "PASS").length ?? 0;
+                            const fail = student.details?.filter((d: any) => d.result === "FAIL").length ?? 0;
+                            return (
+                              <div className="space-y-1.5 min-w-[110px]">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-mono text-white font-semibold">{answered}/{total}</span>
+                                  <span className="text-text-tertiary">{pct}%</span>
+                                </div>
+                                <div className="h-1.5 bg-bg-surface-elevated rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-brand-500 rounded-full transition-all duration-500"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                {answered > 0 && (
+                                  <div className="flex gap-2 text-[10px] font-semibold">
+                                    {pass > 0 && <span className="text-emerald-400">✓ {pass} pass</span>}
+                                    {fail > 0 && <span className="text-rose-400">✗ {fail} fail</span>}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </td>
+
                         <td className="p-4">
                           {student.submittedAt ? (
                             <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-lg">
@@ -232,10 +296,19 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
                               Submitted
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-brand-500/10 border border-brand-500/20 text-brand-400 px-2.5 py-1 rounded-lg">
-                              <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
-                              In Progress
-                            </span>
+                            <div className="flex flex-col gap-1.5">
+                              <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-brand-500/10 border border-brand-500/20 text-brand-400 px-2.5 py-1 rounded-lg">
+                                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
+                                In Progress
+                              </span>
+                              <button
+                                onClick={() => handleForceSubmit(student.studentId)}
+                                disabled={forceSubmitting === student.studentId}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-400 border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 px-2 py-0.5 rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {forceSubmitting === student.studentId ? "Submitting..." : "Force Submit"}
+                              </button>
+                            </div>
                           )}
                         </td>
                         <td className="p-4">
@@ -259,7 +332,7 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
                       {/* ── Expandable detail section ── */}
                       {isExpanded && (
                         <tr key={`${student.id}-detail`}>
-                          <td colSpan={7} className="bg-bg-surface-elevated/10 px-6 py-5 border-t border-border-strong/50">
+                          <td colSpan={8} className="bg-bg-surface-elevated/10 px-6 py-5 border-t border-border-strong/50">
                             <div className="border border-border-strong rounded-xl overflow-hidden">
                               <div className="bg-bg-surface px-4 py-3 border-b border-border-strong">
                                 <span className="text-xs font-bold text-text-tertiary uppercase tracking-wider">
@@ -298,7 +371,9 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
                                           <div className="font-medium text-white text-sm leading-snug">{d.questionTitle}</div>
                                           <span className={`mt-1 inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${
                                             d.questionType === "CODE"
-                                              ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                              : d.questionType === "XPATH"
+                                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                               : "bg-brand-500/10 text-brand-400 border-brand-500/20"
                                           }`}>
                                             {d.questionType}
@@ -312,6 +387,14 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
                                               <CodeExpandRow code={d.sourceCode} language={d.language} />
                                             ) : (
                                               <span className="text-xs text-text-tertiary italic">No code submitted</span>
+                                            )
+                                          ) : d.questionType === "XPATH" ? (
+                                            d.studentXpath ? (
+                                              <code className="font-mono text-xs text-emerald-300 bg-emerald-500/5 border border-emerald-500/10 rounded px-2 py-1 block break-all">
+                                                {d.studentXpath}
+                                              </code>
+                                            ) : (
+                                              <span className="text-xs text-text-tertiary italic">No XPath submitted</span>
                                             )
                                           ) : (
                                             <div className="space-y-1">
@@ -331,8 +414,8 @@ export default function CodingMonitorPage({ params }: { params: Promise<{ id: st
 
                                         {/* Correct answer */}
                                         <td className="px-4 py-3 max-w-[240px]">
-                                          {d.questionType === "CODE" ? (
-                                            <span className="text-xs text-text-tertiary italic">Graded by output</span>
+                                          {d.questionType === "CODE" || d.questionType === "XPATH" ? (
+                                            <span className="text-xs text-text-tertiary italic">Graded by {d.questionType === "XPATH" ? "DOM match" : "output"}</span>
                                           ) : (
                                             <div className="space-y-1">
                                               {d.correctTexts?.length > 0 ? (

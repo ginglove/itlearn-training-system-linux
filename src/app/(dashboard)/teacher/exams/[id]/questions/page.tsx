@@ -9,6 +9,7 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
   const { id: examId } = use(params);
   
   const [questions, setQuestions] = useState<any[]>([]);
+  const [examTitle, setExamTitle] = useState<string>("");
   const showToast = useToast();
   const [isFetching, setIsFetching] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -32,7 +33,6 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
     ],
     codeConfig: {
       timeLimit: 2000,
-      memoryLimit: 128000,
       starterCode: "",
       teacherCode: "",
     },
@@ -62,13 +62,11 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
       codeConfig: q.type === "CODE" && q.config
         ? {
             timeLimit: q.config.timeLimit,
-            memoryLimit: q.config.memoryLimit,
             starterCode: q.config.starterCode || "",
             teacherCode: q.config.teacherCode || "",
           }
         : {
             timeLimit: 2000,
-            memoryLimit: 128000,
             starterCode: "",
             teacherCode: "",
           },
@@ -88,6 +86,7 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
       if (res.ok) {
         const data = await res.json();
         setQuestions(data.questions || []);
+        if (data.examTitle) setExamTitle(data.examTitle);
       }
     } catch (err) {
       console.error("Failed to fetch questions:", err);
@@ -187,7 +186,6 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
           ],
           codeConfig: {
             timeLimit: 2000,
-            memoryLimit: 128000,
             starterCode: "",
             teacherCode: "",
           },
@@ -275,19 +273,22 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div className="min-h-screen bg-bg-base p-8">
+    <div className="min-h-screen bg-bg-base p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
           <div>
             <div className="flex items-center gap-2 text-text-tertiary text-sm mb-2">
               <button onClick={() => router.push("/teacher")} className="hover:text-white transition-colors">Exams</button>
               <span>›</span>
-              <span className="text-text-secondary">Manage Questions</span>
+              {examTitle && <><span className="text-text-secondary truncate max-w-[220px]" title={examTitle}>{examTitle}</span><span>›</span></>}
+              <span className="text-text-secondary">Questions</span>
             </div>
-            <h1 className="text-3xl font-bold text-white">Manage Questions</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">
+              {examTitle || "Manage Questions"}
+            </h1>
             <p className="text-text-secondary mt-1 text-sm">Add, edit, or delete questions for this exam.</p>
           </div>
-          <div className="flex gap-3 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <button
               onClick={() => router.push("/teacher")}
               className="flex items-center gap-1.5 premium-btn-secondary py-2 text-sm"
@@ -295,15 +296,22 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
-              Back
+              <span className="hidden sm:inline">Back</span>
             </button>
             <button
               onClick={() => router.push(`/teacher/exams/${examId}/coding`)}
               className="premium-btn-secondary py-2 text-sm"
             >
-              Coding Constraints
+              <span className="hidden sm:inline">Coding </span>Constraints
             </button>
-            <button 
+            <button
+              onClick={() => router.push(`/teacher/exams/${examId}/xpath`)}
+              className="premium-btn-secondary py-2 text-sm flex items-center gap-1.5"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="hidden sm:inline">XPath </span>Config
+            </button>
+            <button
               onClick={() => {
                 if (showAddForm) {
                   setEditingQuestionId(null);
@@ -319,7 +327,6 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
                     ],
                     codeConfig: {
                       timeLimit: 2000,
-                      memoryLimit: 128000,
                       starterCode: "",
                       teacherCode: "",
                     },
@@ -332,14 +339,14 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
               }}
               className="premium-btn-primary py-2 text-sm"
             >
-              {showAddForm ? "View Question List" : "+ Add Question"}
+              {showAddForm ? "View List" : "+ Add Question"}
             </button>
           </div>
         </div>
 
         {showAddForm ? (
           /* Question Builder Form */
-          <div className="glass-card p-8 mb-8">
+          <div className="glass-card p-4 md:p-8 mb-8">
             <h3 className="text-xl font-bold text-white mb-6">{editingQuestionId ? "Edit Question" : "Create New Question"}</h3>
             <form onSubmit={handleAddQuestion} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -352,6 +359,7 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
                   >
                     <option value="QUIZ">Quiz / Multiple Choice</option>
                     <option value="CODE">Coding Assessment</option>
+                    <option value="XPATH">XPath Automation</option>
                   </select>
                 </div>
                 <div>
@@ -465,18 +473,6 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
                           className="premium-input"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs text-text-tertiary mb-1">Memory Limit (KB)</label>
-                        <input
-                          type="number"
-                          value={newQuestion.codeConfig.memoryLimit}
-                          onChange={(e) => setNewQuestion({
-                            ...newQuestion,
-                            codeConfig: { ...newQuestion.codeConfig, memoryLimit: parseInt(e.target.value) }
-                          })}
-                          className="premium-input"
-                        />
-                      </div>
                     </div>
                     <div className="grid grid-cols-1 gap-6 mt-4">
                       <div>
@@ -521,16 +517,16 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
                     <div className="space-y-4">
                       {newQuestion.testCases.map((tc, i) => (
                         <div key={i} className="bg-bg-surface-elevated rounded-xl p-4 border border-border-strong relative group">
-                          <button 
+                          <button
                             type="button"
                             onClick={() => removeTestCaseField(i)}
                             disabled={newQuestion.testCases.length <= 1}
-                            className="absolute top-4 right-4 text-xs text-text-tertiary hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-0"
+                            className="absolute top-4 right-4 text-xs text-text-tertiary hover:text-rose-400 disabled:opacity-0 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                           >
                             Remove
                           </button>
                           
-                          <div className="grid grid-cols-2 gap-4 mb-4 pr-12">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 pr-0 sm:pr-12">
                             <div>
                               <label className="block text-xs font-medium text-text-tertiary mb-1">Standard Input</label>
                               <textarea
@@ -568,6 +564,22 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
                 </div>
               )}
 
+              {/* XPath info section */}
+              {newQuestion.type === "XPATH" && (
+                <div className="pt-4 border-t border-border-strong">
+                  <div className="flex items-start gap-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-3">
+                    <span className="text-emerald-400 mt-0.5">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                    <p className="text-sm text-emerald-300">
+                      After creating this question, go to <strong>XPath Config</strong> to set the target URL or HTML snippet and the reference XPath locator.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="pt-6 border-t border-border-strong flex justify-end gap-4">
                 <button
                   type="button"
@@ -586,8 +598,7 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
                       ],
                       codeConfig: {
                         timeLimit: 2000,
-                        memoryLimit: 128000,
-                        starterCode: "",
+                          starterCode: "",
                         teacherCode: "",
                       },
                       testCases: [
@@ -649,9 +660,9 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Status statistics */}
-              <div className="glass-card p-6 flex flex-col justify-center col-span-2">
+              <div className="glass-card p-6 flex flex-col justify-center md:col-span-2">
                 <h4 className="text-md font-bold text-white mb-3">Exam Structure</h4>
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                   <div className="bg-bg-surface-elevated/50 p-4 rounded-xl">
                     <div className="text-2xl font-extrabold text-white">
                       {questions.length}
@@ -662,20 +673,26 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
                     <div className="text-2xl font-extrabold text-brand-400">
                       {questions.filter(q => q.type === "QUIZ").length}
                     </div>
-                    <div className="text-xs text-text-tertiary mt-1">Quiz Questions</div>
+                    <div className="text-xs text-text-tertiary mt-1">Quiz</div>
                   </div>
                   <div className="bg-bg-surface-elevated/50 p-4 rounded-xl">
-                    <div className="text-2xl font-extrabold text-blue-400">
+                    <div className="text-2xl font-extrabold text-amber-400">
                       {questions.filter(q => q.type === "CODE").length}
                     </div>
-                    <div className="text-xs text-text-tertiary mt-1">Coding Questions</div>
+                    <div className="text-xs text-text-tertiary mt-1">Coding</div>
+                  </div>
+                  <div className="bg-bg-surface-elevated/50 p-4 rounded-xl">
+                    <div className="text-2xl font-extrabold text-emerald-400">
+                      {questions.filter(q => q.type === "XPATH").length}
+                    </div>
+                    <div className="text-xs text-text-tertiary mt-1">XPath</div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* List of Questions */}
-            <div className="glass-card p-8">
+            <div className="glass-card p-4 md:p-8">
               <h3 className="text-xl font-bold text-white mb-6">Exam Question List</h3>
               
               {isFetching ? (
@@ -689,14 +706,16 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
               ) : (
                 <div className="space-y-4">
                   {questions.map((q, idx) => (
-                    <div key={q.id} className="flex gap-4 p-5 rounded-xl bg-bg-surface hover:bg-bg-surface-elevated border border-border-strong relative group transition-all">
+                    <div key={q.id} className="flex flex-col sm:flex-row gap-3 sm:gap-4 p-4 sm:p-5 rounded-xl bg-bg-surface hover:bg-bg-surface-elevated border border-border-strong relative group transition-all">
                       <div className="flex-grow">
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-xs font-bold text-text-tertiary font-mono">#{idx + 1}</span>
                           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            q.type === 'QUIZ' 
-                              ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20' 
-                              : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            q.type === 'QUIZ'
+                              ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20'
+                              : q.type === 'XPATH'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                           }`}>
                             {q.type}
                           </span>
@@ -725,23 +744,28 @@ export default function ExamQuestionsPage({ params }: { params: Promise<{ id: st
 
                         {q.type === 'CODE' && (
                           <div className="flex gap-4 text-xs text-text-tertiary mt-2 font-mono">
-                            <span>Limit: {q.config?.timeLimit || 2000}ms / {q.config?.memoryLimit || 128000}KB</span>
+                            <span>Time limit: {q.config?.timeLimit || 2000}ms</span>
                             <span>•</span>
                             <span>Test cases: {q.testCases?.length || 0} ({q.testCases?.filter((c: any) => c.isHidden).length || 0} hidden)</span>
                           </div>
                         )}
+                        {q.type === 'XPATH' && (
+                          <div className="text-xs text-emerald-400/70 mt-2 font-mono">
+                            Configure target & reference XPath via <strong>XPath Config</strong>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
                         <button
                           onClick={() => handleStartEdit(q)}
-                          className="px-3 py-1.5 bg-brand-500/10 border border-brand-500/20 text-brand-400 rounded-lg text-xs font-semibold hover:bg-brand-500/20 transition-all opacity-0 group-hover:opacity-100"
+                          className="px-3 py-1.5 bg-brand-500/10 border border-brand-500/20 text-brand-400 rounded-lg text-xs font-semibold hover:bg-brand-500/20 transition-all"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => setDeleteTarget(q.id)}
-                          className="px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-xs font-semibold hover:bg-rose-500/20 transition-all opacity-0 group-hover:opacity-100"
+                          className="px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-xs font-semibold hover:bg-rose-500/20 transition-all"
                         >
                           Remove
                         </button>

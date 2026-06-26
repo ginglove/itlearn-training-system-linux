@@ -6,18 +6,23 @@ import {
   questions,
   quizOptions,
   submissionDetails,
+  xpathConfigs,
 } from "@/db/schema";
 import { eq, sql, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
 async function buildSnapshot(examId: string) {
-  // Total possible score for this exam
+  // Total possible score and question count for this exam
   const [totalPossibleRow] = await db
-    .select({ total: sql<string>`COALESCE(SUM(${questions.points}), 0)` })
+    .select({
+      total: sql<string>`COALESCE(SUM(${questions.points}), 0)`,
+      count: sql<number>`COUNT(*)`,
+    })
     .from(questions)
     .where(eq(questions.examId, examId));
   const totalPossibleScore = totalPossibleRow?.total ?? "0";
+  const totalQuestions = Number(totalPossibleRow?.count ?? 0);
 
   // All submissions with elapsed time
   const submissions = await db
@@ -62,6 +67,7 @@ async function buildSnapshot(examId: string) {
       language: submissionDetails.language,
       sourceCode: submissionDetails.sourceCode,
       selectedOptions: submissionDetails.selectedOptions,
+      studentXpath: submissionDetails.studentXpath,
     })
     .from(submissionDetails)
     .innerJoin(questions, eq(submissionDetails.questionId, questions.id))
@@ -122,14 +128,29 @@ async function buildSnapshot(examId: string) {
         correctIds.length > 0 &&
         correctIds.join(",") === selectedSorted.join(",");
 
+      // Compute quiz score dynamically (same partial-credit formula as grader)
+      // so that score is always consistent with PASS/FAIL display
+      const computedScore = (() => {
+        if (selectedIds.length === 0) return d.score; // unanswered — keep stored value
+        if (correctIds.length === 0) return "0.00";
+        const hasWrong = selectedSorted.some((id) => !correctIds.includes(id));
+        if (hasWrong) return "0.00";
+        const correctCount = selectedSorted.filter((id) =>
+          correctIds.includes(id)
+        ).length;
+        const pts = parseFloat(d.questionPoints as string) || 0;
+        return (pts * (correctCount / correctIds.length)).toFixed(2);
+      })();
+
       return {
         ...d,
+        score: computedScore,
         selectedTexts,
         correctTexts,
         result: isCorrect ? "PASS" : "FAIL",
       };
     } else {
-      // CODE question result
+      // CODE / XPATH question result
       const result =
         d.status === null
           ? "NOT COMPLETED"
@@ -154,7 +175,7 @@ async function buildSnapshot(examId: string) {
     details: detailsBySubmission[s.id] || [],
   }));
 
-  return { totalPossibleScore, roster };
+  return { totalPossibleScore, totalQuestions, roster };
 }
 
 export async function GET(

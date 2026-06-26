@@ -24,13 +24,19 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (unsynced_payloads.length > 200) {
+      return NextResponse.json(
+        { error: "VALIDATION_ERROR", message: "Too many payloads in a single auto-save request." },
+        { status: 400 }
+      );
+    }
 
     const [submission] = await db
       .select()
       .from(examSubmissions)
       .where(eq(examSubmissions.id, subId));
 
-    if (!submission || submission.submittedAt) {
+    if (!submission || submission.studentId !== studentId || submission.examId !== examId || submission.submittedAt) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "Cannot auto-save. Session invalid or already submitted." },
         { status: 403 }
@@ -54,18 +60,20 @@ export async function POST(
           await tx
             .update(submissionDetails)
             .set({
-              selectedOptions: payload.selected_options || existingDetail.selectedOptions,
-              sourceCode: payload.source_code || existingDetail.sourceCode,
-              language: payload.language || existingDetail.language,
+              selectedOptions: payload.selected_options ?? existingDetail.selectedOptions,
+              sourceCode: payload.source_code ?? existingDetail.sourceCode,
+              language: payload.language ?? existingDetail.language,
+              studentXpath: payload.student_xpath ?? existingDetail.studentXpath,
             })
             .where(eq(submissionDetails.id, existingDetail.id));
         } else {
           await tx.insert(submissionDetails).values({
             submissionId: subId,
             questionId: payload.question_id,
-            selectedOptions: payload.selected_options || [],
-            sourceCode: payload.source_code || "",
-            language: payload.language || "python",
+            selectedOptions: payload.selected_options ?? [],
+            sourceCode: payload.source_code ?? "",
+            language: payload.language ?? "python",
+            studentXpath: payload.student_xpath ?? null,
           });
         }
       }

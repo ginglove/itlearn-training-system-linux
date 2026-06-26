@@ -13,6 +13,8 @@ export default function CreateExamPage() {
     startTime: "",
     endTime: "",
     isShuffled: false,
+    sessionType: "QUIZ",
+    focusLossPolicy: "LOG_ONLY",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -117,17 +119,43 @@ export default function CreateExamPage() {
                   className="premium-input"
                 />
               </div>
-              <div className="flex items-center h-full pt-6">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isShuffled}
-                    onChange={(e) => setFormData({ ...formData, isShuffled: e.target.checked })}
-                    className="w-5 h-5 rounded border-border-strong bg-bg-base text-brand-500 focus:ring-brand-500/50"
-                  />
-                  <span className="text-sm font-medium text-white">Shuffle Questions</span>
-                </label>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Session Type</label>
+                <select
+                  value={formData.sessionType}
+                  onChange={(e) => setFormData({ ...formData, sessionType: e.target.value })}
+                  className="premium-input bg-bg-surface-elevated text-white w-full"
+                >
+                  <option value="HOMEWORK">Homework</option>
+                  <option value="QUIZ">Quiz Session</option>
+                  <option value="PRACTICE">Practice</option>
+                  <option value="FINAL">Final Exam</option>
+                </select>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">Focus Loss Policy</label>
+              <select
+                value={formData.focusLossPolicy}
+                onChange={(e) => setFormData({ ...formData, focusLossPolicy: e.target.value })}
+                className="premium-input bg-bg-surface-elevated text-white w-full"
+              >
+                <option value="LOG_ONLY">Log Only — Track tab switches, no penalty</option>
+                <option value="WARN_AND_LOCK">Warn &amp; Lock — Warn twice, auto-submit on 3rd tab switch</option>
+              </select>
+            </div>
+
+            <div className="flex items-center">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.isShuffled}
+                  onChange={(e) => setFormData({ ...formData, isShuffled: e.target.checked })}
+                  className="w-5 h-5 rounded border-border-strong bg-bg-base text-brand-500 focus:ring-brand-500/50"
+                />
+                <span className="text-sm font-medium text-white">Shuffle Questions</span>
+              </label>
             </div>
 
             <div className="pt-6 border-t border-border-strong flex justify-end gap-4">
